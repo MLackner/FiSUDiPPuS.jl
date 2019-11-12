@@ -269,7 +269,7 @@ function build_independents(x1_ssp, x1_ppp, x2_ssp, x2_ppp)
     [x_ssp_spec; x_ppp_spec; x_ssp_diff; x_ppp_diff]
 end
 
-function build_dependents(y_ssp, y_ppp, r_ssp::Int, r_ppp::Int, bleach_weights)
+function build_dependents(y_ssp, y_ppp, r_ssp::Int, r_ppp::Int, bleach_weight)
     # first the plain spectra (turn the matrix and reshape to 1d array)
     # then concatenate vertically
     y_spec = [y_ssp'[:]; y_ppp'[:]]
