@@ -226,7 +226,7 @@ function plotresult(filepath::String)
 
     ymin = model(
         x, r.minimizer,
-        settings[:N],
+        s[:N],
         bleach_weight=T(s[:bleach_weight])
     )
 
