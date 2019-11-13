@@ -133,7 +133,7 @@ function viewsettings(s::Dict)
     ax = subplot(111)
     ax.set_title("PPP Data ROI")
     ax.pcolormesh(z_ppp)
-    draw_roi(ax, s[:roi_ssp])
+    draw_roi(ax, s[:roi_ppp])
 
     f1, f2, f3
 end
