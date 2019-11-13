@@ -7,6 +7,8 @@ using JLD2, FileIO
 using Dates: now
 using PyPlot
 
+export runfit, viewsettings, plotresult, printresult
+
 function runfit(options=joinpath(@__DIR__, "../data/default.jl"))
     ### CONTENTS OF OPTIONS
     ## OPTIMIZATION
@@ -76,7 +78,89 @@ function runfit(options=joinpath(@__DIR__, "../data/default.jl"))
 
     save_result(settings[:savedir], x, y, result, settings)
 
+    printresult(result)
+
     result
+end
+
+function viewsettings(file::String)
+    include(file)   # contains the settings
+    viewsettings(settings)
+end
+
+function viewsettings(s::Dict)
+    function draw_roi(ax, roi)
+        y0 = roi[1][1] - 1 # the plot starts at 0
+        x0 = roi[2][1] - 1
+        y1 = roi[1][end]
+        x1 = roi[2][end]
+
+        rectx = [
+            x0 x1 x1 x0
+            x1 x1 x0 x0
+        ]
+        recty = [
+            y0 y0 y1 y1
+            y0 y1 y1 y0
+        ]
+
+        ax.plot(rectx, recty, "r", linewidth=3)
+    end
+
+    x, y = get_data(s)
+
+    # load the signal data to view the ROIs
+    data_ssp = load(s[:filepath_ssp])
+    data_ppp = load(s[:filepath_ppp])
+    z_ssp = data_ssp["signal"]
+    z_ppp = data_ppp["signal"]
+
+    # Calculate start values
+    ystart = startdata(settings)
+
+    f1 = figure()
+    plot(y, label="data")
+    plot(ystart, label="initial")
+    legend()
+
+    f2 = figure()
+    ax = subplot(111)
+    ax.set_title("SSP Data ROI")
+    ax.pcolormesh(z_ssp)
+    draw_roi(ax, s[:roi_ssp])
+
+    f3 = figure()
+    ax = subplot(111)
+    ax.set_title("PPP Data ROI")
+    ax.pcolormesh(z_ppp)
+    draw_roi(ax, s[:roi_ssp])
+
+    f1, f2, f3
+end
+
+function startdata(settings::Dict)
+    x, _ = get_data(settings)
+    ystart = FiSUDiPPuS.model(
+        x, settings[:datatype].(settings[:start]),
+        settings[:N],
+        bleach_weight=settings[:datatype](settings[:bleach_weight])
+        )
+    ystart
+end
+
+function get_data(s::Dict)
+    get_data(
+        s[:filepath_ssp],
+        s[:filepath_ppp],
+        s[:roi_ssp],
+        s[:roi_ppp],
+        s[:size_ssp],
+        s[:size_ppp],
+        s[:reference_ssp],
+        s[:reference_ppp],
+        s[:bleach_weight],
+        s[:datatype],
+    )
 end
 
 function get_data(
@@ -114,8 +198,8 @@ function get_data(
     x = build_independents(x1_ssp, x1_ppp, x2_ssp, x2_ppp)
     y = build_dependents(y_ssp, y_ppp, reference_ssp, reference_ppp, bleach_weight)
 
-    println("size ssp data: $(size(data_ssp["signal"])) | region of interest: $roi_ssp | resized to $size_ssp")
-    println("size ppp data: $(size(data_ppp["signal"])) | region of interest: $roi_ppp | resized to $size_ppp")
+    # println("size ssp data: $(size(data_ssp["signal"])) | region of interest: $roi_ssp | resized to $size_ssp")
+    # println("size ppp data: $(size(data_ppp["signal"])) | region of interest: $roi_ppp | resized to $size_ppp")
 
     datatype.(x), datatype.(y)
 end
@@ -130,7 +214,7 @@ function get_results(filepath)
     x, y, r, settings
 end
 
-function plotresults(filepath)
+function plotresult(filepath::String)
     x,y,r,s = get_results(filepath)
     T = s[:datatype]
 
@@ -152,6 +236,48 @@ function plotresults(filepath)
     plot(ymin, label="minimized")
     legend()
     f
+end
+
+function printresult(r::String)
+    data = load(r)
+    result = data["result"]
+    printresult(result)
+end
+
+function printresult(r)
+    # Calculate the number of resonances by checking how many big-number
+    # parameters there are.
+    N = length(findall(x -> x > 1000, r.minimizer))
+
+    # Get all the parameters from the result
+    Assp = r.minimizer[   1: N]
+    Appp = r.minimizer[ N+1:2N]
+    ω    = r.minimizer[2N+1:3N]
+    Γ    = r.minimizer[3N+1:4N]
+    Δω   = r.minimizer[end]
+
+    # Get the initial parameter
+    Assp0 = r.initial_x[1:N]
+    Appp0 = r.initial_x[N+1:2N]
+    ω0    = r.initial_x[2N+1:3N]
+    Γ0    = r.initial_x[3N+1:4N]
+    Δω0   = r.initial_x[end]
+
+    n = ["", "Assp", "Appp", "ω", "Γ", "A₀ssp", "A₀ppp", "ω₀", "Γ₀"]
+    @printf "Δω_ppp: %.2f (start: %.2f)\n" Δω Δω0
+
+    # this prints the header
+    for i = 1:length(n)
+        @printf "%8.8s" n[i]
+    end
+    print("\n")
+
+    # this prints the content of the table
+    for i = 1:N
+        @printf "%8.4u %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f\n" i Assp[i] Appp[i] ω[i] Γ[i] Assp0[i] Appp0[i] ω0[i] Γ0[i]
+    end
+
+    nothing
 end
 
 """
