@@ -6,13 +6,11 @@ A_ppp = [8.0, -6.0, 3]
 a_ssp = [1.0, 1.0, 1.0,
         0.99, 0.98, 0.97,
         0.98, 0.96, 0.94]
-a_ppp = [1.0, 1.0, 1.0,
-        0.96, 0.92, 0.88,
-        0.98, 0.94, 0.90]
-
+a_pow = 0.9   # factor by which we power the a_ssp values to
+               # to get the a_ppp values
 
 a_ssp = reshape(a_ssp, (3,3))' # num time steps, num resonances
-a_ppp = reshape(a_ppp, (3,3))'
+a_ppp = a_ssp .^ a_pow
 wn    = range(2830, stop=2990, length=301) |> collect
 
 sig_ssp = zeros(size(a_ssp,1), length(wn))
@@ -28,10 +26,12 @@ savepath = joinpath(@__DIR__, "../data")
 d_ssp = Dict(
     "wavenumber" => wn,
     "signal"     => sig_ssp,
+    "dltime"     => range(-3, 5, length=length(a_ssp)÷3)
 )
 d_ppp = Dict(
     "wavenumber" => wn,
     "signal"     => sig_ppp,
+    "dltime"     => range(-3, 5, length=length(a_ssp)÷3)
 )
 
 save(joinpath(savepath, "sample_ssp.jld2"), d_ssp)
