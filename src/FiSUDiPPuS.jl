@@ -325,14 +325,16 @@ function model(x::Array{T,2}, p::Array{T,1}, N::Int, bleach_weight::T;
     a_idx = 4N+1
 
     y = Array{T,1}(undef, size(x,1))
-    α = zero(T)
-    a = Array{T,1}(undef, N)
+    α = Array{T,1}(undef, N)
+    a = p[a_idx:a_idx+N-1]
+    # define our α
+    # TODO: Make sure the ssp spectrum comes first!
+    α = a .* A_ssp
 
-    for i ∈ eachindex(y)
-        a .= p[a_idx:a_idx+N-1]
+    @inbounds for i ∈ eachindex(y)
         if pol[i] == 0
             #ssp spectrum
-            α = a .* A_ssp
+            # α .= a .* A_ssp
 
             if dif[i] == 1
                 # difference ssp
@@ -345,8 +347,11 @@ function model(x::Array{T,2}, p::Array{T,1}, N::Int, bleach_weight::T;
             end
         else
             # ppp spectrum
-            share_a && (a .^= a_pow)
-            α = a .* A_ppp
+            # if share_a
+            #     @. α = (a ^ a_pow) * A_ppp
+            # else
+            #     @. α = a * A_ppp
+            # end
 
             if dif[i] == 1
                 # difference ppp
@@ -361,21 +366,42 @@ function model(x::Array{T,2}, p::Array{T,1}, N::Int, bleach_weight::T;
         if i != length(y)
             # check if we have to increase the index for
             # the `a`s
-            if t[i+1] != t[i] # next time step
-                a_idx += N
-            end
             if share_a && t[i+1] < t[i]
                 # reset to start value if we change to
-                # change the spectra.
+                # the next spectrum (no matter if its a plain or
+                # a difference spectrum)
                 # TODO: make sure the spectra are ordered
                 # correctly timewise
                 a_idx = 4N+1
+                a .= p[a_idx:a_idx+N-1]
+                # Since the α values are dependent on the a values we
+                # have to change them too. Additionaly we have to check if
+                # there's an ssp or a ppp spectrum coming up next.
+                if pol[i+1] == 0
+                    @. α = a * A_ssp
+                else
+                    @. α = a ^ a_pow * A_ppp
+                end
+            elseif t[i+1] != t[i] # just go to the next time step
+                a_idx += N
+                a .= p[a_idx:a_idx+N-1]
+                if pol[i+1] == 0
+                    @. α = a * A_ssp
+                else
+                    @. α = a ^ a_pow * A_ppp
+                end
             end
             if !share_a && dif[i+1] > dif[i]
                 # if the a values shall not be shared between the
                 # spectra reset to the start index when we switch
                 # to the difference spectra
                 a_idx = 4N+1
+                a .= p[a_idx:a_idx+N-1]
+                if pol[i+1] == 0
+                    @. α = a * A_ssp
+                else
+                    @. α = a ^ a_pow * A_ppp
+                end
             end
         end
     end
