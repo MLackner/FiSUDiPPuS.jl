@@ -12,6 +12,11 @@ using PyPlot: figure, plot, legend, subplot
 export runfit, viewsettings, plotresult, printresult
 
 function runfit(options::String=joinpath(@__DIR__, "../data/default.jl"); share_a::Bool=true)
+    include(options)
+    runfit(settings)
+end
+
+function runfit(settings::Dict; share_a::Bool=true)
     ### CONTENTS OF OPTIONS
     ## OPTIMIZATION
     # iterations
@@ -34,7 +39,6 @@ function runfit(options::String=joinpath(@__DIR__, "../data/default.jl"); share_
     # N
     ## SAVING
     # savedir
-    include(options)
 
     ## Convert to correct types
     start = settings[:datatype].(settings[:start])
