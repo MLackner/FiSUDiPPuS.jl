@@ -469,7 +469,9 @@ end
 function save_result(savedir,x,y,r,settings; saveprefix="")
     method = typeof(r.method)
     !isdir(savedir) && mkdir(savedir)
-    filename = saveprefix * "_" * string(now()) * ".jld2"
+    datestr = string(now())
+    datestr = replace(datestr, ":" => ".")
+    filename = saveprefix * "_" * datestr * ".jld2"
     savepath = joinpath(savedir, filename)
 
     d = Dict(
