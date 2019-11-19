@@ -6,7 +6,7 @@ include("gendata.jl")
 
 @testset "FiSUDiPPuS.jl" begin
     settings_file = joinpath(@__DIR__, "../data/default.jl")
-    r = runfit(settings_file)
+    r = runfit(settings_file; saveprefix="test")
     @test round(r.minimizer[1], digits=6) ≈ A_ssp[1]
     @test round(r.minimizer[4], digits=6) ≈ A_ppp[1]
     @test round(r.minimizer[end-1], digits=6) ≈ a_pow

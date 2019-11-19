@@ -11,12 +11,13 @@ using PyPlot: figure, plot, legend, subplot
 
 export runfit, viewsettings, plotresult, printresult
 
-function runfit(options::String=joinpath(@__DIR__, "../data/default.jl"); share_a::Bool=true)
+function runfit(options::String=joinpath(@__DIR__, "../data/default.jl");
+        share_a::Bool=true, saveprefix="")
     include(options)
-    runfit(settings)
+    runfit(settings; share_a=share_a, saveprefix=saveprefix)
 end
 
-function runfit(settings::Dict; share_a::Bool=true)
+function runfit(settings::Dict; share_a::Bool=true, saveprefix="")
     ### CONTENTS OF OPTIONS
     ## OPTIMIZATION
     # iterations
@@ -82,7 +83,8 @@ function runfit(settings::Dict; share_a::Bool=true)
             )
         )
 
-    save_result(settings[:savedir], x, y, result, settings)
+    save_result(settings[:savedir], x, y, result, settings;
+                saveprefix=saveprefix)
 
     result
 end
@@ -464,10 +466,10 @@ function build_dependents(y_ssp, y_ppp, r_ssp::Int, r_ppp::Int, bleach_weight)
     [y_spec; y_diff]
 end
 
-function save_result(savedir,x,y,r,settings)
+function save_result(savedir,x,y,r,settings; saveprefix="")
     method = typeof(r.method)
     !isdir(savedir) && mkdir(savedir)
-    filename = string(now()) * ".jld2"
+    filename = saveprefix * "_" * string(now()) * ".jld2"
     savepath = joinpath(savedir, filename)
 
     d = Dict(
