@@ -1,29 +1,45 @@
 using BenchmarkTools
 using FiSUDiPPuS
 
-options = joinpath(@__DIR__, "../data/default.jl")
-include(options)
+p = [
+    1.0, -2.0,  # A_ssp
+    2.0, -0.5,  # A_ppp
+    2870, 2940, # ω
+    10.0, 10.0, # Γ
+    0.9, 0.95,  # a
+    1.0,        # Δω_ppp
+    1.5,        # a_pow
+    0.02,        # χ3
+    -π,          # φ
+]
 
-x,y = FiSUDiPPuS.get_data(settings) # settings is a dict in the options file
+x = range(2800, 3050, length=151) |> collect
+# y = model(x,p, diff=false, pol=:ppp)
+# plot(x,y)
 
-## Convert to correct types
-start = settings[:datatype].(settings[:start])
-bleach_weight = settings[:datatype](settings[:bleach_weight])
+# Preallocate complex array
+y = zeros(length(x))
+@btime model!(y, x, p, diff=false, pol=:ssp)
+@btime model!(y, x, p, diff=true , pol=:ssp)
+@btime model!(y, x, p, diff=false, pol=:ppp)
+@btime model!(y, x, p, diff=true , pol=:ppp)
 
-@btime FiSUDiPPuS.model($x[:,:], $start, $settings[:N], $bleach_weight);
+# 11.742 μs (8 allocations: 5.56 KiB)
+# 23.296 μs (12 allocations: 9.58 KiB)
+# 11.786 μs (9 allocations: 5.66 KiB)
+# 23.498 μs (14 allocations: 9.77 KiB)
 
-x = 3000.0
-A = [1.0, -1.0]
-Γ = [8.0, 8.0]
-ω = [2900.0, 2910.0]
-@btime FiSUDiPPuS.sfspec($x, $A, $ω, $Γ)
+# 11.420 μs (6 allocations: 1.73 KiB)
+# 22.712 μs (9 allocations: 3.25 KiB)
+# 11.450 μs (7 allocations: 1.83 KiB)
+# 22.934 μs (11 allocations: 3.44 KiB)
 
-# 496.331 μs (4505 allocations: 510.06 KiB)
-# 336.573 μs (2259 allocations: 194.02 KiB)
-# 296.531 μs (22 allocations: 89.84 KiB)
-# 298.902 μs (19 allocations: 89.52 KiB)
-# 196.338 μs (20 allocations: 89.63 KiB)
+# 10.790 μs (5 allocations: 224 bytes)
+# 28.772 μs (157 allocations: 14.42 KiB)
+# 16.843 μs (156 allocations: 14.38 KiB)
+# 48.191 μs (459 allocations: 42.73 KiB)
 
-
-# 573.098 ns (11 allocations: 1.19 KiB)
-# 447.626 ns (9 allocations: 928 bytes)
+# 10.102 μs (6 allocations: 512 bytes)
+# 20.101 μs (7 allocations: 608 bytes)
+# 10.100 μs (6 allocations: 512 bytes)
+# 20.093 μs (7 allocations: 608 bytes)
