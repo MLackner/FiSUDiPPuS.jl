@@ -17,7 +17,7 @@ settings = Dict(
     :N => 3,                        # number of resonances
 
     # Optimization Settings
-    :method => :LBFGS,
+    :method => :BFGS,
     :iterations => 100_000_000_000,
     :n_particles => 50,
     :start => [

@@ -362,7 +362,7 @@ function model(x, p; pol=:none, diff=false, tstep=1)
     pol ≠ :ssp && pol ≠ :ppp && error("pol $pol not defined")
 
     # Get number of resonances
-    N = (length(p) - 4) ÷ 5
+    N = (length(p) - 4) ÷ 6
 
     # Decompse parameter array
     A = Array{Float64,1}(undef,N)
