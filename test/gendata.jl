@@ -1,3 +1,6 @@
+using Random
+Random.seed!(1)
+
 # Generate Data
 A_ssp = [-4.0, 3.0, -8.0]
 A_ppp = [8.0, -6.0, 3]
@@ -22,6 +25,9 @@ for i = 1:size(a_ssp,1), j = 1:length(wn)
     sig_ssp[i,j] = FiSUDiPPuS.sfspec(wn[j], a_ssp[i,:] .* A_ssp, ω, Γ, χ3=χ3, φ=φ)
     sig_ppp[i,j] = FiSUDiPPuS.sfspec(wn[j], a_ppp[i,:] .* A_ppp, ω, Γ, χ3=χ3, φ=φ)
 end
+
+sig_ssp .+= randn(size(sig_ssp)) ./ 200
+sig_ppp .+= randn(size(sig_ppp)) ./ 200
 
 # Save Data
 savepath = joinpath(@__DIR__, "../data")

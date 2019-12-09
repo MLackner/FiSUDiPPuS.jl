@@ -18,11 +18,10 @@ x = range(2800, 3050, length=151) |> collect
 # plot(x,y)
 
 # Preallocate complex array
-y = zeros(length(x))
-@btime model!(y, x, p, diff=false, pol=:ssp)
-@btime model!(y, x, p, diff=true , pol=:ssp)
-@btime model!(y, x, p, diff=false, pol=:ppp)
-@btime model!(y, x, p, diff=true , pol=:ppp)
+@btime model(x, p, diff=false, pol=:ssp)
+@btime model(x, p, diff=true , pol=:ssp)
+@btime model(x, p, diff=false, pol=:ppp)
+@btime model(x, p, diff=true , pol=:ppp)
 
 # 11.742 μs (8 allocations: 5.56 KiB)
 # 23.296 μs (12 allocations: 9.58 KiB)
@@ -43,3 +42,16 @@ y = zeros(length(x))
 # 20.101 μs (7 allocations: 608 bytes)
 # 10.100 μs (6 allocations: 512 bytes)
 # 20.093 μs (7 allocations: 608 bytes)
+
+using Optim
+include(joinpath(@__DIR__, "../data/default.jl"))
+for m in [
+        LBFGS(),
+        BFGS(),
+        ]
+    settings[:method] = m
+    @time r = runfit(settings)
+    println(typeof(m))
+    println(r.minimizer)
+    println("-"^30)
+end

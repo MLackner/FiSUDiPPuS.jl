@@ -51,9 +51,9 @@ function runfit(settings::Dict; saveprefix="")
     # Process the data
     spectra = get_data(settings)
 
+    c = Array{Float64,1}(undef, length(spectra)) # start cost
     function cost(p)
-        c = Array{Float64,1}(undef, length(spectra)) # start cost
-        Threads.@threads for i in 1:length(c)
+        Threads.@threads for i in 1:length(spectra)
             c[i] = sum(
                 (model(spectra[i].ω, p; pol=spectra[i].pol,
                         diff=spectra[i].diff, tstep=spectra[i].tstep) .-
@@ -66,14 +66,14 @@ function runfit(settings::Dict; saveprefix="")
         sum(c)
     end
 
-    if settings[:method] == :ParticleSwarm
+    if settings[:method] == ParticleSwarm()
         method = ParticleSwarm(
             lower=lower,
             upper=upper,
             n_particles=settings[:n_particles],
         )
-    elseif settings[:method] == :LBFGS
-        method = Fminbox(LBFGS())
+    else
+        method = Fminbox(settings[:method])
     end
 
     result = optimize(
