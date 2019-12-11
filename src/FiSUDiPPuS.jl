@@ -7,10 +7,8 @@ using Images: imresize
 using JLD2
 using FileIO: load, save
 using Dates: now
-using PyPlot: figure, plot, legend, subplot
-using Base.Threads
 
-export runfit, viewsettings, plotresult, printresult, model, get_data
+export runfit, printresult, model, get_data
 
 function runfit(options::String=joinpath(@__DIR__, "../data/default.jl");
         share_a::Bool=true, saveprefix="", multithreading=true)
@@ -303,20 +301,26 @@ function printresult(r)
     Appp = r.minimizer[ N+1:2N]
     ω    = r.minimizer[2N+1:3N]
     Γ    = r.minimizer[3N+1:4N]
-    a_pow= r.minimizer[end-1]
-    Δω   = r.minimizer[end]
+    Δω   = r.minimizer[end-3]
+    a_pow= r.minimizer[end-2]
+    χ3   = r.minimizer[end-1]
+    φ    = r.minimizer[end]
 
     # Get the initial parameter
     Assp0 = r.initial_x[1:N]
     Appp0 = r.initial_x[N+1:2N]
     ω0    = r.initial_x[2N+1:3N]
     Γ0    = r.initial_x[3N+1:4N]
-    a_pow0= r.initial_x[end-1]
-    Δω0   = r.initial_x[end]
+    Δω0   = r.initial_x[end-3]
+    a_pow0=r.initial_x[end-2]
+    χ30   = r.initial_x[end-1]
+    φ0    = r.initial_x[end]
 
     n = ["", "Assp", "Appp", "ω", "Γ", "A₀ssp", "A₀ppp", "ω₀", "Γ₀"]
     @printf "Δω_ppp: %.3f (start: %.3f)\n" Δω Δω0
     @printf "a_pow:  %.3f (start: %.3f)\n" a_pow a_pow0
+    @printf "χ3:     %.3f (start: %.3f)\n" χ3 χ30
+    @printf "φ:      %.3f (start: %.3f)\n" φ φ0
 
     # this prints the header
     for i = 1:length(n)
