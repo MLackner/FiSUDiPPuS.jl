@@ -88,21 +88,21 @@ end
 #     end
 # end
 #
-# begin
-#     settings_file = joinpath(@__DIR__, "../data/default.jl")
-#     gendata = joinpath(@__DIR__, "../test/gendata.jl")
-#     include(settings_file)
-#     include(gendata)
-#
-#     data = get_data(settings)
-#     p = [A_ssp..., A_ppp..., ω..., Γ..., a_ssp'..., Δω..., a_pow..., χ3..., φ...]
-#     p[1:4] ./= 10
-#     p[5:6] ./= 10000
-#     p[7:8] ./= 10
-#     for i = 1:length(data)
-#         y = model(data[i].ω, p, pol=data[i].pol, tstep=data[i].tstep, diff=data[i].diff)
-#         @show i
-#         @show data[i].signal[100], y[100]
-#         @show data[i].signal ≈ y
-#     end
-# end
+begin
+    settings_file = joinpath(@__DIR__, "../data/default.jl")
+    gendata = joinpath(@__DIR__, "../test/gendata.jl")
+    include(settings_file)
+    include(gendata)
+
+    data = get_data(settings)
+    p = [A_ssp..., A_ppp..., ω..., Γ..., a_ssp'..., δω'..., Δω..., a_pow..., χ3..., φ...]
+    p[1:6] ./= 10
+    p[7:9] ./= 10000
+    p[10:12] ./= 10
+    for i = 1:length(data)
+        y = model(data[i].ω, p, pol=data[i].pol, tstep=data[i].tstep, diff=data[i].diff, n_steps=2, ω_shift=true, N=3)
+        @show i
+        @show data[i].signal[100], y[100]
+        @show data[i].signal ≈ y
+    end
+end

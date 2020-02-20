@@ -53,9 +53,13 @@ function runfit(settings::Dict; saveprefix="")
         c = Array{Float64,1}(undef, length(spectra)) # start cost
         Threads.@threads for i in 1:length(spectra)
             c[i] = sum(
-                (model(spectra[i].ω, p; pol=spectra[i].pol,
-                        diff=spectra[i].diff, tstep=spectra[i].tstep,
-                        N=settings[:N]) .-
+                (model(spectra[i].ω, p;
+                        pol=spectra[i].pol,
+                        diff=spectra[i].diff,
+                        tstep=spectra[i].tstep,
+                        N=settings[:N],
+                        n_steps=settings[:n_steps],
+                        ω_shift=settings[:ω_shift]) .-
                 spectra[i].signal).^2
             )
             if spectra[i].diff == true
@@ -290,7 +294,7 @@ function printresult(r::String, N)
     printresult(result, N)
 end
 
-function printresult(r, N)
+function printresult(r, N, ω_shift=false)
     p = best_candidate(r)
 
     # Get all the parameters from the result
@@ -302,6 +306,21 @@ function printresult(r, N)
     a_pow= p[end-2]
     χ3   = p[end-1]
     φ    = p[end]
+
+    # all step dependent parameters
+    sdp = p[4N+1:end-4]
+    n_sdp = length(sdp)
+    ω_shift ? (n_steps = n_sdp ÷ 2 ÷ N) : (n_steps = n_sdp ÷ N)
+    if ω_shift == true
+        a  = sdp[1:n_steps*N]
+        δω = sdp[n_steps*N+1:end]
+    else
+        a  = sdp
+        δω = fill(0.0, n_sdp)
+    end
+
+    a  = reshape(a , (N, n_steps))'
+    δω = reshape(δω, (N, n_steps))'
 
     n = ["", "Assp", "Appp", "ω", "Γ"]
     @printf "Δω_ppp: %.3f\n" Δω
@@ -318,6 +337,24 @@ function printresult(r, N)
     # this prints the content of the table
     for i = 1:N
         @printf "%8.4u %8.4f %8.4f %8.4f %8.4f\n" i Assp[i] Appp[i] ω[i] Γ[i]
+    end
+
+    print("\n")
+    # print header for time dependet parameters
+    @printf "%8.8s" "STEP"
+    for i = 1:N
+        header_a  = "a$i"
+        header_δω = "δω$i"
+        @printf "%8.8s %8.8s" header_a header_δω
+    end
+    print("\n")
+
+    for i in 1:n_steps
+        @printf "%8.4u" i
+        for j in 1:N
+            @printf "%8.4f %8.4f" a[i,j] δω[i,j]
+        end
+        print("\n")
     end
 
     nothing
@@ -349,7 +386,7 @@ p vector:
 * χ3
 * φ
 """
-function model(x, p; pol=:none, diff=false, tstep=1, N=1)
+function model(x, p; pol=:none, diff=false, tstep=1, N=1, ω_shift=false, n_steps=2)
     pol ≠ :ssp && pol ≠ :ppp && error("pol $pol not defined")
 
     # Decompse parameter array
@@ -364,13 +401,19 @@ function model(x, p; pol=:none, diff=false, tstep=1, N=1)
     end
     Γ     = p[3N+1:4N] .* 10
 
+    if ω_shift == true
+        # We have extra parameters for the shift of each resonance
+        δω = p[4N+N*n_steps+1+N*(tstep-1) : 5N+N*n_steps+N*(tstep-1)]
+        ω .+= δω # apply wavelength shift
+    end
+
     Δω_ppp= p[end-3]
     a_pow = p[end-2]
     χ3    = p[end-1]
     φ     = p[end]
 
-    α = p[3N+N*tstep+1:4N+N*tstep]
-    pol == :ppp && (α .^= a_pow)
+    α = p[4N+1+N*(tstep - 1) : 5N+N*(tstep - 1)]
+    pol == :ppp && (α .^= a_pow) # adjust for different pump strength
     α .*= A
 
     # Preallocate signal
@@ -379,6 +422,7 @@ function model(x, p; pol=:none, diff=false, tstep=1, N=1)
     for i in eachindex(y)
         y[i] = sfspec(x[i], α, ω, Γ; φ=φ, χ3=χ3)
     end
+    ω_shift && (ω .-= δω) # disapply wavelength shift
     if diff == true
         for i in eachindex(y)
             y[i] -= sfspec(x[i], A, ω, Γ; φ=φ, χ3=χ3)
@@ -403,7 +447,7 @@ function save_result(savedir,spectra,r,settings; saveprefix="")
     )
 
     save(savepath, d)
-    nothing
+    :nothing
 end
 
 end # module
