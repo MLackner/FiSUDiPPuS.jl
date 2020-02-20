@@ -1,7 +1,6 @@
 module FiSUDiPPuS
 
-using Optim: optimize, LBFGS, ParticleSwarm, Fminbox
-import Optim
+using BlackBoxOptim
 using Printf: @printf
 using Images: imresize
 using JLD2
@@ -41,47 +40,40 @@ function runfit(settings::Dict; saveprefix="")
     # savedir
 
     ## Convert to correct types
-    start = settings[:datatype].(settings[:start])
-    lower = settings[:datatype].(settings[:lower])
-    upper = settings[:datatype].(settings[:upper])
     bleach_weight = settings[:datatype](settings[:bleach_weight])
 
     # Process the data
     spectra = get_data(settings)
 
-    c = Array{Float64,1}(undef, length(spectra)) # start cost
-    function cost(p)
+    # Calculate universal cost. This is returned as an array. We have to then
+    # check if the :borg_moea algorithm was selected or any other. The borg_moea
+    # requires a tuple of fitnesses all other algorithms require a single float
+    # value.
+    function cost_universal(p)
+        c = Array{Float64,1}(undef, length(spectra)) # start cost
         Threads.@threads for i in 1:length(spectra)
             c[i] = sum(
                 (model(spectra[i].ω, p; pol=spectra[i].pol,
-                        diff=spectra[i].diff, tstep=spectra[i].tstep) .-
+                        diff=spectra[i].diff, tstep=spectra[i].tstep,
+                        N=settings[:N]) .-
                 spectra[i].signal).^2
             )
             if spectra[i].diff == true
                 c[i] *= settings[:bleach_weight]
             end
         end
-        sum(c)
+        c
     end
 
-    if settings[:method] == ParticleSwarm()
-        method = ParticleSwarm(
-            lower=lower,
-            upper=upper,
-            n_particles=settings[:n_particles],
-        )
+    if settings[:options][:Method] == :borg_moea
+        cost = p -> tuple(cost_universal(p)...)
     else
-        method = Fminbox(settings[:method])
+        cost = p -> sum(cost_universal(p))
     end
 
-    result = optimize(
-        cost, lower, upper, start,
-        method,
-        Optim.Options(
-            iterations=settings[:iterations],
-            show_trace=false,
-            time_limit=settings[:time_limit],
-            )
+    result = bboptimize(
+        cost;
+        settings[:options]..., # solver options (bboptimize)
         )
 
     save_result(settings[:savedir], spectra, result, settings;
@@ -247,6 +239,13 @@ function get_data(
             end
         end
     end
+
+    # In case we have only one spectrum there is no difference spectrum provided
+    # So we can delete the first and third spectra
+    # if size_ssp[1] == 1 && size_ppp[1] == 1
+    #     deleteat!(s, [1,3])
+    # end
+    # @show size(s)
     return s
 end
 
@@ -285,42 +284,30 @@ function plotresult(filepath::String)
     f
 end
 
-function printresult(r::String)
+function printresult(r::String, N)
     data = load(r)
     result = data["result"]
-    printresult(result)
+    printresult(result, N)
 end
 
-function printresult(r)
-    # Calculate the number of resonances by checking how many big-number
-    # parameters there are.
-    N = length(findall(x -> x > 1000, r.minimizer))
+function printresult(r, N)
+    p = best_candidate(r)
 
     # Get all the parameters from the result
-    Assp = r.minimizer[   1: N]
-    Appp = r.minimizer[ N+1:2N]
-    ω    = r.minimizer[2N+1:3N]
-    Γ    = r.minimizer[3N+1:4N]
-    Δω   = r.minimizer[end-3]
-    a_pow= r.minimizer[end-2]
-    χ3   = r.minimizer[end-1]
-    φ    = r.minimizer[end]
+    Assp = p[   1: N]
+    Appp = p[ N+1:2N]
+    ω    = p[2N+1:3N]
+    Γ    = p[3N+1:4N]
+    Δω   = p[end-3]
+    a_pow= p[end-2]
+    χ3   = p[end-1]
+    φ    = p[end]
 
-    # Get the initial parameter
-    Assp0 = r.initial_x[1:N]
-    Appp0 = r.initial_x[N+1:2N]
-    ω0    = r.initial_x[2N+1:3N]
-    Γ0    = r.initial_x[3N+1:4N]
-    Δω0   = r.initial_x[end-3]
-    a_pow0=r.initial_x[end-2]
-    χ30   = r.initial_x[end-1]
-    φ0    = r.initial_x[end]
-
-    n = ["", "Assp", "Appp", "ω", "Γ", "A₀ssp", "A₀ppp", "ω₀", "Γ₀"]
-    @printf "Δω_ppp: %.3f (start: %.3f)\n" Δω Δω0
-    @printf "a_pow:  %.3f (start: %.3f)\n" a_pow a_pow0
-    @printf "χ3:     %.3f (start: %.3f)\n" χ3 χ30
-    @printf "φ:      %.3f (start: %.3f)\n" φ φ0
+    n = ["", "Assp", "Appp", "ω", "Γ"]
+    @printf "Δω_ppp: %.3f\n" Δω
+    @printf "a_pow:  %.3f\n" a_pow
+    @printf "χ3:     %.3f\n" χ3
+    @printf "φ:      %.3fπ\n" φ/π
 
     # this prints the header
     for i = 1:length(n)
@@ -330,7 +317,7 @@ function printresult(r)
 
     # this prints the content of the table
     for i = 1:N
-        @printf "%8.4u %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f\n" i Assp[i] Appp[i] ω[i] Γ[i] Assp0[i] Appp0[i] ω0[i] Γ0[i]
+        @printf "%8.4u %8.4f %8.4f %8.4f %8.4f\n" i Assp[i] Appp[i] ω[i] Γ[i]
     end
 
     nothing
@@ -362,30 +349,27 @@ p vector:
 * χ3
 * φ
 """
-function model(x, p; pol=:none, diff=false, tstep=1)
+function model(x, p; pol=:none, diff=false, tstep=1, N=1)
     pol ≠ :ssp && pol ≠ :ppp && error("pol $pol not defined")
-
-    # Get number of resonances
-    N = (length(p) - 4) ÷ 6
 
     # Decompse parameter array
     A = Array{Float64,1}(undef,N)
     ω = Array{Float64,1}(undef,N)
     if pol == :ssp
-        A .= p[   1: N]
-        ω .= p[2N+1:3N]
+        A .= p[   1: N] .* 10
+        ω .= p[2N+1:3N] .* 1e4
     elseif pol == :ppp
-        A .= p[ N+1:2N]
-        ω .= p[2N+1:3N] .+ p[end-3] # this is the shift
+        A .= p[ N+1:2N] .* 10
+        ω .= p[2N+1:3N] .* 1e4 .+ p[end-3] # this is the shift
     end
-    Γ     = p[3N+1:4N]
+    Γ     = p[3N+1:4N] .* 10
 
     Δω_ppp= p[end-3]
     a_pow = p[end-2]
     χ3    = p[end-1]
     φ     = p[end]
 
-    α = p[(3+tstep)*N+1:(4+tstep)*N]
+    α = p[3N+N*tstep+1:4N+N*tstep]
     pol == :ppp && (α .^= a_pow)
     α .*= A
 
