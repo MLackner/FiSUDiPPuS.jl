@@ -11,10 +11,10 @@ include("gendata.jl")
     r = runfit(settings, saveprefix="test")
 
     p = best_candidate(r)
-    @test round(p[1], digits=1) * 10 ≈ A_ssp[1]
-    @test round(p[4], digits=1) * 10 ≈ A_ppp[1]
+    @test round(p[1], digits=2) * 10 ≈ A_ssp[1]
+    @test round(p[4], digits=2) * 10 ≈ A_ppp[1]
     #TODO: The optimization results are not as good as they used to be
-    @test round(p[end-2], digits=1) ≈ a_pow
+    @test round(p[end-1], digits=2) ≈ a_pow
 
     # run the other exported functions on the data to check if they error
     # get latest results
@@ -95,7 +95,7 @@ begin
     include(gendata)
 
     data = get_data(settings)
-    p = [A_ssp..., A_ppp..., ω..., Γ..., a_ssp'..., δω'..., Δω..., a_pow..., χ3..., φ...]
+    p = [A_ssp..., A_ppp..., ω..., Γ..., φ..., a_ssp'..., δω'..., Δω..., a_pow..., χnr...]
     p[1:6] ./= 10
     p[7:9] ./= 10000
     p[10:12] ./= 10

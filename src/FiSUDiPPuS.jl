@@ -302,13 +302,14 @@ function printresult(r, N, ω_shift=false)
     Appp = p[ N+1:2N]
     ω    = p[2N+1:3N]
     Γ    = p[3N+1:4N]
-    Δω   = p[end-3]
-    a_pow= p[end-2]
-    χ3   = p[end-1]
-    φ    = p[end]
+    φssp = p[4N+1:5N]
+    φppp = p[5N+1:6N]
+    Δω   = p[end-2]
+    a_pow= p[end-1]
+    χnr  = p[end]
 
     # all step dependent parameters
-    sdp = p[4N+1:end-4]
+    sdp = p[6N+1:end-3]
     n_sdp = length(sdp)
     ω_shift ? (n_steps = n_sdp ÷ 2 ÷ N) : (n_steps = n_sdp ÷ N)
     if ω_shift == true
@@ -322,21 +323,20 @@ function printresult(r, N, ω_shift=false)
     a  = reshape(a , (N, n_steps))'
     δω = reshape(δω, (N, n_steps))'
 
-    n = ["", "Assp", "Appp", "ω", "Γ"]
+    n = ["", "Assp", "Appp", "ω", "Γ", "φssp", "φppp"]
     @printf "Δω_ppp: %.3f\n" Δω
     @printf "a_pow:  %.3f\n" a_pow
-    @printf "χ3:     %.3f\n" χ3
-    @printf "φ:      %.3fπ\n" φ/π
+    @printf "χnr:    %.3f\n" χnr
 
     # this prints the header
     for i = 1:length(n)
-        @printf "%8.8s" n[i]
+        @printf "%9s" n[i]
     end
     print("\n")
 
     # this prints the content of the table
     for i = 1:N
-        @printf "%8.4u %8.4f %8.4f %8.4f %8.4f\n" i Assp[i] Appp[i] ω[i] Γ[i]
+        @printf "%8.4u %8.4f %8.4f %8.4f %8.4f %8.4fπ %8.4fπ\n" i Assp[i] Appp[i] ω[i] Γ[i] φssp[i]/π φppp[i]/π
     end
 
     print("\n")
@@ -363,15 +363,14 @@ end
 """
 sum frequency spectrum
 Keyword arguments:
-φ:  χ(3) phase angle
-χ3: χ(3) strength
+χnr: nonresonant background
 """
-function sfspec(x, A, ω, Γ; φ=0π, χ3=0.0)
+function sfspec(x, A, ω, Γ, φ=zeros(length(A)); χnr=0.0)
     ycmplx = 0.0 + 0.0im
     for i = 1:size(A,1)
-        ycmplx += A[i] / (x - ω[i] - 1im * Γ[i])
+        ycmplx += A[i] / (x - ω[i] - 1im * Γ[i]) * exp(1im * φ[i])
     end
-    ycmplx += χ3 * exp(1im * φ)
+    ycmplx += χnr
     abs2(ycmplx)
 end
 
@@ -389,30 +388,54 @@ p vector:
 function model(x, p; pol=:none, diff=false, tstep=1, N=1, ω_shift=false, n_steps=2)
     pol ≠ :ssp && pol ≠ :ppp && error("pol $pol not defined")
 
+    # 01: A_ssp_1
+    # 02: A_ssp_2
+    # 03: A_ppp_1
+    # 04: A_ppp_2
+    # 05: ω_1
+    # 06: ω_2
+    # 07: Γ_1
+    # 08: Γ_2
+    # 09: φ_1
+    # 10: φ_2
+    # 11: a_11
+    # 12: a_21
+    # 13: a_12
+    # 14: a_22
+    # 15: Δω_11
+    # 16: Δω_21
+    # 17: Δω_12
+    # 18: Δω_12
+    # 19: Δω_ppp
+    # 20: a_pow
+    # 21: χnr
+
     # Decompse parameter array
     A = Array{Float64,1}(undef,N)
     ω = Array{Float64,1}(undef,N)
+    φ = Array{Float64,1}(undef,N)
     if pol == :ssp
         A .= p[   1: N] .* 10
         ω .= p[2N+1:3N] .* 1e4
+        φ .= p[4N+1:5N]
     elseif pol == :ppp
         A .= p[ N+1:2N] .* 10
-        ω .= p[2N+1:3N] .* 1e4 .+ p[end-3] # this is the shift
+        ω .= p[2N+1:3N] .* 1e4 .+ p[end-2] # this is the shift
+        φ .= p[5N+1:6N]
     end
     Γ     = p[3N+1:4N] .* 10
 
     if ω_shift == true
         # We have extra parameters for the shift of each resonance
-        δω = p[4N+N*n_steps+1+N*(tstep-1) : 5N+N*n_steps+N*(tstep-1)]
+        δω = p[6N+N*n_steps+1+N*(tstep-1) : 7N+N*n_steps+N*(tstep-1)]
         ω .+= δω # apply wavelength shift
     end
 
-    Δω_ppp= p[end-3]
-    a_pow = p[end-2]
-    χ3    = p[end-1]
-    φ     = p[end]
+    Δω_ppp= p[end-2]
+    a_pow = p[end-1]
+    χnr    = p[end]
 
-    α = p[4N+1+N*(tstep - 1) : 5N+N*(tstep - 1)]
+    α = p[6N+1+N*(tstep - 1) : 7N+N*(tstep - 1)]
     pol == :ppp && (α .^= a_pow) # adjust for different pump strength
     α .*= A
 
@@ -420,12 +443,14 @@ function model(x, p; pol=:none, diff=false, tstep=1, N=1, ω_shift=false, n_step
     y = Array{Float64,1}(undef, length(x))
 
     for i in eachindex(y)
-        y[i] = sfspec(x[i], α, ω, Γ; φ=φ, χ3=χ3)
+        y[i] = sfspec(x[i], α, ω, Γ, φ; χnr=χnr)
     end
-    ω_shift && (ω .-= δω) # disapply wavelength shift
+
+    ω_shift && (ω .-= δω) # disapply wavelength shift because we use the
+                          # reference spectrum in the next step
     if diff == true
         for i in eachindex(y)
-            y[i] -= sfspec(x[i], A, ω, Γ; φ=φ, χ3=χ3)
+            y[i] -= sfspec(x[i], A, ω, Γ, φ; χnr=χnr)
         end
     end
 

@@ -3,10 +3,12 @@ using FileIO, JLD2
 Random.seed!(1)
 
 # Generate Data
-A_ssp = [-2.0, -4.0, 8.0]
-A_ppp = [-9.0, 4.0, 1.0]
-Γ     = [10.0, 8.0, 9.0]
+A_ssp = [2.0, 4.0, 8.0]
+A_ppp = [9.0, 4.0, 1.0]
 ω     = [2880, 2910, 2930]
+Γ     = [10.0, 8.0, 9.0]
+φ     = [0, -π, 0.5π,
+         0,  π, 0]
 a_ssp = [1.0, 1.0, 1.0,
         0.85, 0.90, 0.91]
 δω    = [0.0, 0.0, 0.0,
@@ -14,8 +16,7 @@ a_ssp = [1.0, 1.0, 1.0,
 Δω = -0.0
 a_pow = 0.9   # factor by which we power the a_ssp values to
                # to get the a_ppp values
-χ3 = 0.1
-φ  = π/2
+χnr = 0.1
 
 a_ssp = reshape(a_ssp, (3,2))' #  num resonances, num time steps
 δω    = reshape(δω   , (3,2))' #  num resonances, num time steps
@@ -26,8 +27,12 @@ sig_ssp = zeros(size(a_ssp,1), length(wn))
 sig_ppp = similar(sig_ssp)
 
 for i = 1:size(a_ssp,1), j = 1:length(wn)
-    sig_ssp[i,j] = FiSUDiPPuS.sfspec(wn[j], a_ssp[i,:] .* A_ssp, ω .+ δω[i,:], Γ, χ3=χ3, φ=φ)
-    sig_ppp[i,j] = FiSUDiPPuS.sfspec(wn[j], a_ppp[i,:] .* A_ppp, ω .+ Δω .+ δω[i,:], Γ, χ3=χ3, φ=φ)
+    sig_ssp[i,j] = FiSUDiPPuS.sfspec(
+        wn[j], a_ssp[i,:] .* A_ssp, ω .+ δω[i,:], Γ, φ[1:3], ;χnr=χnr
+    )
+    sig_ppp[i,j] = FiSUDiPPuS.sfspec(
+        wn[j], a_ppp[i,:] .* A_ppp, ω .+ Δω .+ δω[i,:], Γ, φ[4:6]; χnr=χnr
+    )
 end
 
 # sig_ssp .+= randn(size(sig_ssp)) ./ 200
