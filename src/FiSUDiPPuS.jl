@@ -43,7 +43,18 @@ function runfit(settings::Dict; saveprefix="")
     bleach_weight = settings[:datatype](settings[:bleach_weight])
 
     # Process the data
-    spectra = get_data(settings)
+    if settings[:single] == false
+        spectra = get_data(settings)
+    elseif settings[:single] == true
+        spectra = get_data(
+            settings[:filepath],
+            settings[:roi],
+            settings[:size],
+            settings[:refidx],
+            settings[:bleach_weight],
+            settings[:pol]
+        )
+    end
 
     # Calculate universal cost. This is returned as an array. We have to then
     # check if the :borg_moea algorithm was selected or any other. The borg_moea
@@ -164,6 +175,72 @@ struct Spectrum
     tstep::Int
 end
 
+"""
+Get as single pump probe spectrum
+The spectrum can be resized by passing a tuple '(x,y)' as
+argument for 'resize'. If no resizing is wanted it can be set
+to '(:full, :full)'.
+"""
+function get_data(
+    filepath
+    roi,
+    resize,
+    refidx,
+    bleach_weight,
+    pol
+    )
+
+    data = load(filepath)
+
+    # time step indices
+    if resize[1] == :full
+        x1 = 1:size(data["wavenumber"], 1)
+    else
+        x1 = 1:resize[1]
+    end
+
+    # wavenumbers
+    x2 = data["wavenumber"][roi[2]]
+    # resize wavenumbers
+    if resize[2] != :full
+        x2 = imresize(x2, size[2])
+    end
+
+    # signal
+    y = data["signal"][roi...]
+
+    # order the spectra from low to high delay in the roi
+    p = sortperm(data["dltime"][roi[1]])
+    y = y[p,:] # permute
+
+    # resize
+    if resize[1] != :full && resize[2] != :full
+        y = imresize(y, resize)
+    elseif resize[1] != :full
+        y = imresize(y, (resize[1], :))
+    elseif resize[2] != :full
+        y = imresize(y, (:, resize[2]))
+    end
+
+    s = Spectrum[]
+    r = y[refidx, :]
+    for i in eachindex(x1), isdiff in [:false, :true]
+        _y = y[i,:]
+        tstep = i
+        isdiff && (_y .-= r)
+
+        _s = Spectrum(
+            x2,
+            _y,
+            pol,
+            isdiff,
+            tstep
+        )
+        push!(s, _s)
+    end
+
+    s
+end
 
 """
 Returns an array of spectra

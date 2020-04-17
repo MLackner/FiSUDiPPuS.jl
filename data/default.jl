@@ -19,6 +19,13 @@ settings = Dict(
     # should the problem be solved allowing the resonances to shift?
     :ω_shift => true,
 
+    :single => false,
+    # in case single is true these settings are relevant
+    :filepath => joinpath(@__DIR__, "sample_ssp.jld2"),
+    :roi => (:, :),
+    :pol => :ssp,
+    :size => (:full, :full),
+
     :options => Dict(
         :TraceMode => :compact,
         :TraceInterval => 4.0,
