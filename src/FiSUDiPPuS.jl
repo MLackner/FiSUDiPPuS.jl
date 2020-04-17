@@ -6,6 +6,7 @@ using Images: imresize
 using JLD2
 using FileIO: load, save
 using Dates: now
+using Statistics
 
 export runfit, printresult, model, get_data
 
@@ -223,7 +224,7 @@ function get_data(
     end
 
     s = Spectrum[]
-    r = y[refidx, :]
+    r = mean(y[refidx, :], dims=1)
     for i in eachindex(x1), isdiff in [:false, :true]
         _y = y[i,:]
         tstep = i
