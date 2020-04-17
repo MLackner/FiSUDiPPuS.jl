@@ -224,7 +224,7 @@ function get_data(
     end
 
     s = Spectrum[]
-    r = mean(y[refidx, :], dims=1)
+    r = mean(y[refidx, :], dims=1)[:]
     for i in eachindex(x1), isdiff in [:false, :true]
         _y = y[i,:]
         tstep = i
