@@ -203,7 +203,7 @@ function get_data(
     x2 = data["wavenumber"][roi[2]]
     # resize wavenumbers
     if resize[2] != :full
-        x2 = imresize(x2, size[2])
+        x2 = imresize(x2, resize[2])
     end
 
     # signal

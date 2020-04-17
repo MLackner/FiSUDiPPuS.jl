@@ -25,6 +25,7 @@ settings = Dict(
     :roi => (:, :),
     :pol => :ssp,
     :size => (:full, :full),
+    :refidx => 1,
 
     :options => Dict(
         :TraceMode => :compact,
