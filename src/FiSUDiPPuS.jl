@@ -182,7 +182,7 @@ argument for 'resize'. If no resizing is wanted it can be set
 to '(:full, :full)'.
 """
 function get_data(
-    filepath
+    filepath,
     roi,
     resize,
     refidx,
