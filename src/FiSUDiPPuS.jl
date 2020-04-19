@@ -120,11 +120,16 @@ function printresult(result, settings, nspectra)
     for s in universal_header
         str *= @sprintf "%9s" s
     end
-    for s in per_spectrum_header
+
+    for i in 1:nspectra
+        str *= @sprintf "%9s" "A" * string(i)
+    end
+    if settings[:phase]
         for i in 1:nspectra
-            str *= @sprintf "%9s" s * string(i)
+            str *= @sprintf "%9s" "φ" * string(i)
         end
     end
+
     str *= "\n"
 
     for i in 1:settings[:N]
@@ -142,9 +147,11 @@ function printresult(result, settings, nspectra)
             str *= @sprintf "%9.2f" A
         end
         # print phases
-        for j in 1:nspectra
-            φ = x[j,1][2][i]
-            str *= @sprintf "%8.2fπ" φ / π
+        if settings[:phase]
+            for j in 1:nspectra
+                φ = x[j,1][2][i]
+                str *= @sprintf "%8.2fπ" φ / π
+            end
         end
 
         str *= "\n"
@@ -156,8 +163,11 @@ function printresult(result, settings, nspectra)
     for n in 1:settings[:N]
         str *= @sprintf "%9s" steps_header[2] * string(n)
     end
-    for n in 1:settings[:N]
-        str *= @sprintf "%9s" steps_header[3] * string(n)
+
+    if settings[:ω_shift]
+        for n in 1:settings[:N]
+            str *= @sprintf "%9s" steps_header[3] * string(n)
+        end
     end
 
     str *= "\n"
@@ -170,9 +180,12 @@ function printresult(result, settings, nspectra)
             a = x[1,i][5][n]
             str *= @sprintf "%9.3f" a
         end
-        for n in 1:settings[:N]
-           δω = x[1,i][6][n]
-            str *= @sprintf "%9.3f" δω
+
+        if settings[:ω_shift]
+            for n in 1:settings[:N]
+               δω = x[1,i][6][n]
+                str *= @sprintf "%9.3f" δω
+            end
         end
         str *= "\n"
     end
