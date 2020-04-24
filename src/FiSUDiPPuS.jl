@@ -8,7 +8,7 @@ using FileIO: load, save
 using Dates: now
 using Statistics
 
-export runfit, printresult, model, get_data, Spectrum
+export runfit, printresult, model, get_data, Spectrum, getparam
 
 
 struct Spectrum
@@ -336,5 +336,35 @@ function save_result(spectra, result, settings)
     save(savepath, d)
     :nothing
 end
+
+"""
+Load a specific parameter from the result
+tstep either :all or Int
+"""
+function getparam(result, settings, param::Symbol; tstep=0, specidx=1)
+    if tstep==:all
+        tstep = 1:settings[:n_steps]
+    end
+    pk = [:A, :φ, :ω, :Γ, :a, :δω, :χnr, :Δω, :β]
+    p = best_candidate(result)
+    param_out = zeros(settings[:N], length(tstep))
+    for (i,t) in enumerate(tstep)
+        pd = FiSUDiPPuS.decompose_parameters(p;
+            specidx=specidx,
+            phase=settings[:phase],
+            ω_shift=settings[:ω_shift],
+            tstep=t,
+            N=settings[:N],
+            n_steps=settings[:n_steps],
+        )
+        param_select = pd[pk .== param][1]
+        param_out[:,i] .= param_select
+    end
+    param_out
+end
+getparam(data, param; kwargs...) = getparam(
+    data["result"], data["settings"], param; kwargs...
+)
+
 
 end # module
