@@ -52,7 +52,7 @@ function runfit(spectra::Array{Spectrum}, settings::Dict)
         settings[:options]..., # solver options (bboptimize)
         )
 
-    save_result(spectra, result, settings)
+    settings[:save] && save_result(spectra, result, settings)
     printresult(result, settings, length(spectra)) |> print
 
     result
@@ -63,7 +63,7 @@ end
 function get_results(filepath)
     data = load(filepath)
     x = data["x"]
-    y = data["y"]
+    y = data["spectra"]
     r = data["result"]
     settings = data["settings"]
 
@@ -199,11 +199,28 @@ Keyword arguments:
 χnr: nonresonant background
 """
 function sfspec(x, A, ω, Γ, φ=zeros(length(A)); χnr=0.0)
-    ycmplx = 0.0 + 0.0im
+    ycmplx = zero(ComplexF64)
     for i = 1:size(A,1)
         ycmplx += A[i] / (x - ω[i] - 1im * Γ[i]) * exp(1im * φ[i])
     end
     ycmplx += χnr
+    abs2(ycmplx)
+end
+
+function sfspec(x, A::Array{ComplexF64}, ω::Array{ComplexF64}, Γ::Array{ComplexF64}, φ::Array{ComplexF64}; χnr=zero(ComplexF64))
+    ycmplx = zero(ComplexF64)
+    for i = 1:size(A,1)
+        ycmplx += A[i] / (x - ω[i] - Γ[i]) * exp(φ[i])
+    end
+    ycmplx += χnr
+    abs2(ycmplx)
+end
+
+function sfspec(x, A::Array{ComplexF64}, ω::Array{ComplexF64}, Γ::Array{ComplexF64})
+    ycmplx = zero(ComplexF64)
+    for i = 1:size(A,1)
+        ycmplx += A[i] / (x - ω[i] - Γ[i])
+    end
     abs2(ycmplx)
 end
 
@@ -299,19 +316,48 @@ p vector:
 * χ3
 * φ
 """
-function model(x, p; tstep=0, kwargs...)
+function model(x, p; tstep=0, phase=false, kwargs...)
 
-    A, φ, ω, Γ, a, δω, χnr, Δω, β = decompose_parameters(p; tstep=tstep, kwargs...)
+    A, φ, ω, Γ, a, δω, χnr, Δω, β = decompose_parameters(p;
+        tstep=tstep, phase=phase,
+        kwargs...
+    )
+
+    ω .+= Δω
+    δω .+= ω
+    a .^= β
+    a .*= A
+    Γc = Γ .* 1im
+    phase && (φc = φ .|> ComplexF64)
+    ac = a .|> ComplexF64
+    Ac = A .|> ComplexF64
+    ωc = ω .|> ComplexF64
+    δωc = δω .|> ComplexF64
+    χnrc = χnr .|> ComplexF64
 
     # Preallocate signal
     y = Array{Float64,1}(undef, length(x))
-    for i in eachindex(y)
-        y[i] = sfspec(x[i], (a.^β) .* A, ω .+ Δω .+ δω, Γ, φ; χnr=χnr)
+    if phase && χnr != zero(ComplexF64)
+        Threads.@threads for i in eachindex(y)
+            # y[i] = sfspec(x[i], (a.^β) .* A, ω .+ Δω .+ δω, Γ, φ; χnr=χnr)
+            y[i] = sfspec(x[i], ac, δωc, Γc, φc; χnr=χnrc)
+        end
+    else
+        Threads.@threads for i in eachindex(y)
+            y[i] = sfspec(x[i], ac, δωc, Γc)
+        end
     end
 
     if tstep > 0
-        for i in eachindex(y)
-            y[i] -= sfspec(x[i], A, ω .+ Δω, Γ, φ; χnr=χnr)
+        if phase && χnr != zero(ComplexF64)
+            Threads.@threads for i in eachindex(y)
+                # y[i] -= sfspec(x[i], A, ω .+ Δω, Γ, φ; χnr=χnr)
+                y[i] -= sfspec(x[i], Ac, ωc, Γc, φc; χnr=χnrc)
+            end
+        else
+            Threads.@threads for i in eachindex(y)
+                y[i] -= sfspec(x[i], Ac, ωc, Γc)
+            end
         end
     end
 

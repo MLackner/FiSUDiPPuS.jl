@@ -123,6 +123,27 @@ using FiSUDiPPuS
     @test β == β_in
 end
 
+
+@testset "Spectrum" begin
+    # With pase and nonresonant background
+    A = [1.0]
+    ω = [2900.0]
+    Γ = [1.0]
+    φ = [0.0]
+    χnr = 0.0
+    x = 2900.0
+    y = FiSUDiPPuS.sfspec(x, A, ω, Γ, φ; χnr=χnr)
+    @test y == 1.0
+
+    # Without pase and nonresonant background
+    A = [1.0 .+ 0.0im]
+    ω = [2900.0 .+ 0.0im]
+    Γ = [1.0 .+ 0.0im]
+    x = 2900.0
+    y = FiSUDiPPuS.sfspec(x, A, ω, Γ)
+    @test y == 1.0
+end
+
 @testset "Model" begin
     A = 1.0
     φ = 0.0
@@ -143,7 +164,7 @@ end
         Γ
     ]
 
-    y = model(x,p; phase=false, tstep=0, n_steps=0, N=1, ω_shift=false)
+    global y = model(x,p; phase=false, tstep=0, n_steps=0, N=1, ω_shift=false)
 
     @test maximum(y) == 1.0
     @test x[argmax(y)] == 2900
@@ -183,7 +204,8 @@ end
 
 A1 = [0.5, 2.0, -0.3]
 A2 = [-1.0, 0.0, 0.3]
-a = [0.5, 0.9, 0.9]
+a = [0.5, 0.9, 0.9,
+     0.12, 0.13, 0.14]
 χnr = 0.0
 Δω1 = 0.0
 Δω2 = 1.5
@@ -197,8 +219,10 @@ p = [A1..., χnr, Δω1, β1,
      ω..., Γ..., a...]
 
 x = 2800:3000
-n_steps = 1
+n_steps = 2
 N = 3
+
+@show FiSUDiPPuS.decompose_parameters(p, n_steps=2, N=3, tstep=2)
 
 signal1 = zeros(n_steps+1,length(x))
 signal2 = zeros(n_steps+1,length(x))
@@ -217,6 +241,7 @@ s1 = Spectrum(x, signal1)
 s2 = Spectrum(x, signal2)
 
 spectra = [s1, s2]
+spectra = [s1]
 settings = Dict(
     :options => Dict(
         :SearchRange => Tuple{Float64,Float64}[
@@ -228,10 +253,10 @@ settings = Dict(
             (1,1), # β
             # SPEC 2
             # oscillator strengths
-            fill((-1.5,3), N)...,
-            (0,0),  # χnr
-            (-2,2), # Δω
-            (0.5,2.0), # β
+            # fill((-1.5,3), N)...,
+            # (0,0),  # χnr
+            # (-2,2), # Δω
+            # (0.5,2.0), # β
             # UNIVERSAL
             # wavenumbers
             (2910, 2930),
@@ -240,21 +265,21 @@ settings = Dict(
             # damping coefficients
             fill((6.0, 15.0), N)...,
             # a values
-            fill((0.3,1.1), N)...,
+            fill((0.0,1.1), N*n_steps)...,
+            # δω values
+            # (0,0),
+            # (-1,0),
+            # (0,0),
         ],
         :MaxSteps => 1e5,
         :MaxTime => 20,
+        :PopulationSize => 50,
     ),
-    :n_steps => 1,
+    :n_steps => 2,
     :ω_shift => false,
     :phase => false,
     :N => 3,
     :bleach_weight => 3,
+    :save => false,
 )
 result = runfit(spectra, settings)
-
-# plt = plot()
-# for i in 1:size(signal,1)
-#     plot!(x, signal[i,:])
-# end
-# display(plt)

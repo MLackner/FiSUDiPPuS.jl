@@ -1,57 +1,65 @@
 using BenchmarkTools
 using FiSUDiPPuS
 
-p = [
-    1.0, -2.0,  # A_ssp
-    2.0, -0.5,  # A_ppp
-    2870, 2940, # ω
-    10.0, 10.0, # Γ
-    0.9, 0.95,  # a
-    1.0,        # Δω_ppp
-    1.5,        # a_pow
-    0.02,        # χ3
-    -π,          # φ
-]
+N = 3
+n_spec = 1
+n_steps = 2
 
-x = range(2800, 3050, length=151) |> collect
-# y = model(x,p, diff=false, pol=:ppp)
-# plot(x,y)
+# A parameters and χ, Δω, β
+A = rand(N*n_spec + 3*n_spec)
+ω = rand(2800:3000, N)
+Γ = rand(N)
+a = rand(N * n_steps + N)
 
-# Preallocate complex array
-@btime model(x, p, diff=false, pol=:ssp)
-@btime model(x, p, diff=true , pol=:ssp)
-@btime model(x, p, diff=false, pol=:ppp)
-@btime model(x, p, diff=true , pol=:ppp)
+p = [A..., ω..., Γ..., a...]
 
-# 11.742 μs (8 allocations: 5.56 KiB)
-# 23.296 μs (12 allocations: 9.58 KiB)
-# 11.786 μs (9 allocations: 5.66 KiB)
-# 23.498 μs (14 allocations: 9.77 KiB)
+x = range(2800, 3000, length=512)
 
-# 11.420 μs (6 allocations: 1.73 KiB)
-# 22.712 μs (9 allocations: 3.25 KiB)
-# 11.450 μs (7 allocations: 1.83 KiB)
-# 22.934 μs (11 allocations: 3.44 KiB)
-
-# 10.790 μs (5 allocations: 224 bytes)
-# 28.772 μs (157 allocations: 14.42 KiB)
-# 16.843 μs (156 allocations: 14.38 KiB)
-# 48.191 μs (459 allocations: 42.73 KiB)
-
-# 10.102 μs (6 allocations: 512 bytes)
-# 20.101 μs (7 allocations: 608 bytes)
-# 10.100 μs (6 allocations: 512 bytes)
-# 20.093 μs (7 allocations: 608 bytes)
-
-using Optim
-include(joinpath(@__DIR__, "../data/default.jl"))
-for m in [
-        LBFGS(),
-        BFGS(),
-        ]
-    settings[:method] = m
-    @time r = runfit(settings)
-    println(typeof(m))
-    println(r.minimizer)
-    println("-"^30)
-end
+A, ω, Γ, φ, χnr = (rand(5), rand(5), rand(5), fill(0.0, 5), 0.0)
+Γc = Γ .|> ComplexF64
+φc = φ .|> ComplexF64
+Ac = A .|> ComplexF64
+ωc = ω .|> ComplexF64
+χnrc = χnr |> ComplexF64
+@btime FiSUDiPPuS.sfspec(x[1], A, ω, Γ, φ; χnr = χnr)
+# 537.707 ns (4 allocations: 64 bytes)
+@btime FiSUDiPPuS.sfspec(x[1], Ac, ωc, Γc, φc; χnr = χnrc)
+# 509.188 ns (4 allocations: 64 bytes)
+# 486.272 ns (4 allocations: 64 bytes)
+@btime FiSUDiPPuS.sfspec(x[1], Ac, ωc, Γc)
+# 116.253 ns (2 allocations: 32 bytes)
+# I can't get this four times speedup translated to the model function
+@btime FiSUDiPPuS.decompose_parameters(p;
+    n_steps=n_steps,
+    N=N,
+    specidx=1,
+    phase=false,
+    ω_shift=false,
+    tstep=0
+)
+# 967.600 ns (14 allocations: 1.45 KiB)
+@btime FiSUDiPPuS.model(x,p;
+    phase=false,
+    ω_shift=false,
+    n_steps=n_steps,
+    N=N,
+    tstep=0
+)
+# 91.503 μs (1040 allocations: 117.63 KiB)
+# 58.314 μs (1056 allocations: 119.17 KiB)
+# 30.020 μs (32 allocations: 7.14 KiB)
+# 24.292 μs (38 allocations: 7.91 KiB)
+# 20.660 μs (38 allocations: 7.88 KiB)
+@btime FiSUDiPPuS.model(x,p;
+    phase=false,
+    ω_shift=false,
+    n_steps=n_steps,
+    N=N,
+    tstep=1
+)
+# 186.784 μs (1553 allocations: 173.73 KiB)
+# 136.760 μs (1569 allocations: 175.28 KiB)
+# 117.164 μs (1584 allocations: 176.80 KiB)
+# 57.173 μs (48 allocations: 8.75 KiB)
+# 45.478 μs (54 allocations: 9.53 KiB)
+# 38.661 μs (54 allocations: 9.47 KiB)
